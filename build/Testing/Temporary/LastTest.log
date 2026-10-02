@@ -1,0 +1,35 @@
+Start testing: Oct 01 21:41 EDT
+----------------------------------------------------------
+1/2 Testing: ahrs_timeline
+1/2 Test: ahrs_timeline
+Command: "/Users/will/dev/Swamplaunch/RocketVisualizer/build/ahrs_timeline_tests"
+Directory: /Users/will/dev/Swamplaunch/RocketVisualizer/build
+"ahrs_timeline" start time: Oct 01 21:41 EDT
+Output:
+----------------------------------------------------------
+AHRS timeline tests passed
+<end of output>
+Test time =   0.21 sec
+----------------------------------------------------------
+Test Passed.
+"ahrs_timeline" end time: Oct 01 21:41 EDT
+"ahrs_timeline" time elapsed: 00:00:00
+----------------------------------------------------------
+
+2/2 Testing: ahrs_stdin
+2/2 Test: ahrs_stdin
+Command: "/opt/homebrew/Frameworks/Python.framework/Versions/3.14/bin/python3.14" "/Users/will/dev/Swamplaunch/RocketVisualizer/tests/stdin_integration.py" "/Users/will/dev/Swamplaunch/RocketVisualizer/build/ahrs_timeline_tests"
+Directory: /Users/will/dev/Swamplaunch/RocketVisualizer/build
+"ahrs_stdin" start time: Oct 01 21:41 EDT
+Output:
+----------------------------------------------------------
+AHRS stdin tests passed
+<end of output>
+Test time =   0.08 sec
+----------------------------------------------------------
+Test Passed.
+"ahrs_stdin" end time: Oct 01 21:41 EDT
+"ahrs_stdin" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Oct 01 21:41 EDT

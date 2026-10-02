@@ -1,0 +1,77 @@
+# RocketVisualizer
+
+The visualizer can import pose CSVs through its File menu, display the default
+demo, or follow the controller's AHRS output live. The live path is a text pipe:
+controller stdout or Teensy USB serial feeds `--live-stdin`, which publishes
+samples into the existing `LiveRocketTimeline`. No extra server is required.
+
+## Build
+
+Requires CMake 3.25+, a C++20 compiler, and Python 3 for tests. CMake downloads
+pinned Eigen, raylib, ImGui and rlImGui dependencies if needed.
+From the repository root:
+
+```sh
+cmake -S RocketVisualizer -B RocketVisualizer/build
+cmake --build RocketVisualizer/build
+ctest --test-dir RocketVisualizer/build --output-on-failure
+```
+
+For timeline and ingestion tests without a graphics dependency, configure with
+`-DROCKET_VISUALIZER_BUILD_APP=OFF`. Resources are located from the source tree,
+so the executable can be launched from the repository root or another directory.
+For multi-configuration generators, build with `--config Debug` and use the
+executable under `build/Debug` in the commands below.
+
+## Connect a controller
+
+Build the desktop controller using [its README](../FlightController/README.md).
+For CSV replay at the original sample pace:
+
+```sh
+FlightController/build/desktop/FlightController --csv FlightController/examples/sensors.csv --realtime --telemetry | RocketVisualizer/build/RocketVisualizer --live-stdin
+```
+
+For the OpenRocket bridge, start this pipeline, then run the simulation with the
+TCP Bridge extension enabled:
+
+```sh
+FlightController/build/desktop/FlightController --openrocket --telemetry | RocketVisualizer/build/RocketVisualizer --live-stdin
+```
+
+For a Teensy with the new firmware, find its port with `pio device list`, then
+pipe the raw serial monitor output (substitute the actual port):
+
+```sh
+pio device monitor -p /dev/cu.usbmodem123456 -b 115200 --raw --quiet | RocketVisualizer/build/RocketVisualizer --live-stdin
+```
+
+These are shell pipelines; on Windows use `cmd.exe` to preserve streaming text.
+The visualizer follows the newest sample by default. Pause or scrub to inspect
+buffered history; **Timeline → Go To Live** or **End** resumes following. When
+input ends, the window stays open with the buffered timeline. A decreasing source
+timestamp clears history for a controller restart. Close the serial monitor with
+Ctrl+C when finished.
+
+## Telemetry format
+
+Each record ends in a newline:
+
+```text
+AHRS1,time_seconds,north_m,east_m,down_m,qw,qx,qy,qz
+```
+
+The quaternion maps controller body FRD (+X nose, +Y right, +Z down) into world
+NED (+X north, +Y east, +Z down). The receiver converts both position and attitude
+to the visualizer's NWU world and RDF body frames; no import-dialog settings are
+needed. The timestamp is the sensor or simulation clock, not arrival time.
+
+The controller sends its current estimated attitude and position, with barometric
+altitude replacing estimated vertical position when available. Horizontal position
+comes from the controller's existing inertial estimate and can drift; there is
+no GPS position correction. Unavailable position is sent as zero, and records
+without a valid attitude are skipped. This stream does not contain fin commands.
+
+Serial diagnostics and malformed records are ignored. The reader handles records
+split across reads, discards oversized or incomplete lines, and polls available
+input from the render loop so an idle pipe does not freeze playback or shutdown.

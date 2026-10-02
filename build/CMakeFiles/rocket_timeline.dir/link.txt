@@ -1,0 +1,2 @@
+/usr/bin/ar qc librocket_timeline.a CMakeFiles/rocket_timeline.dir/src/RocketState.cpp.o CMakeFiles/rocket_timeline.dir/src/VectorRocketTimeline.cpp.o CMakeFiles/rocket_timeline.dir/src/LiveRocketTimeline.cpp.o CMakeFiles/rocket_timeline.dir/src/CoordinateConverter.cpp.o CMakeFiles/rocket_timeline.dir/src/AhrsTelemetryParser.cpp.o CMakeFiles/rocket_timeline.dir/src/StdinAhrsProducer.cpp.o
+/usr/bin/ranlib librocket_timeline.a
