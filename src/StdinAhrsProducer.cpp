@@ -1,6 +1,7 @@
 #include "StdinAhrsProducer.hpp"
 #include "AhrsTelemetryParser.hpp"
 #include <algorithm>
+#include <iostream>
 #include <stdexcept>
 #ifdef _WIN32
 #define NOMINMAX
@@ -11,6 +12,8 @@
 #include <poll.h>
 #include <unistd.h>
 #endif
+
+#include <iostream>
 
 StdinAhrsProducer::StdinAhrsProducer(std::shared_ptr<LiveRocketTimeline> timeline)
     : _timeline(std::move(timeline)) {

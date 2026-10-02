@@ -21,7 +21,7 @@ int main(int argc, char** argv) {
     }
     RocketVisualizer visualizer;
     auto timeline = std::make_shared<LiveRocketTimeline>();
-    visualizer.SetConfigAndTimeline({}, timeline);
+    visualizer.SetConfigAndTimeline(RocketConfig{}, timeline);
     if (liveStdin) {
         SetWindowTitle("Rocket Visualizer - Live AHRS");
         StdinAhrsProducer producer(timeline);
