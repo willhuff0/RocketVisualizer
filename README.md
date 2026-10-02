@@ -39,19 +39,48 @@ TCP Bridge extension enabled:
 FlightController/build/desktop/FlightController --openrocket --telemetry | RocketVisualizer/build/RocketVisualizer --live-stdin
 ```
 
-For a Teensy with the new firmware, find its port with `pio device list`, then
-pipe the raw serial monitor output (substitute the actual port):
+For a Teensy with the new firmware, use the direct serial reader. PlatformIO's
+device monitor requires a live terminal and cannot supply this pipe. Set up the
+reader once (on Windows, use `RocketVisualizer\.venv\Scripts\python.exe` for the
+venv interpreter):
 
 ```sh
-pio device monitor -p /dev/cu.usbmodem123456 -b 115200 --raw --quiet | RocketVisualizer/build/RocketVisualizer --live-stdin
+python3 -m venv RocketVisualizer/.venv
+RocketVisualizer/.venv/bin/python -m pip install -r RocketVisualizer/tools/requirements.txt
+RocketVisualizer/.venv/bin/python RocketVisualizer/tools/serial_telemetry.py --list-ports
 ```
 
-These are shell pipelines; on Windows use `cmd.exe` to preserve streaming text.
+Then substitute the actual port and launch the visualizer with the reader:
+
+```sh
+RocketVisualizer/.venv/bin/python RocketVisualizer/tools/serial_telemetry.py --port /dev/cu.usbmodem123456 --visualizer RocketVisualizer/build/RocketVisualizer
+```
+
+On Windows the port will look like `COM3`, and the visualizer path ends in `.exe`.
+Close other monitors using the port before connecting. The reader uses 115200
+baud by default; override it with `--baud`. It reads the serial port directly,
+forwards bytes immediately, and closes the port when the visualizer exits.
+Ctrl+C stops the reader; the visualizer stays open with the received history.
+Disconnects and open failures are reported on stderr. To use a shell pipe or
+record the raw stream instead, omit `--visualizer` to emit serial bytes on stdout:
+
+```sh
+RocketVisualizer/.venv/bin/python RocketVisualizer/tools/serial_telemetry.py --port /dev/cu.usbmodem123456 | RocketVisualizer/build/RocketVisualizer --live-stdin
+```
+
+The `ahrs_serial` CTest checks the reader using virtual serial ports on macOS/Linux
+when the configured Python has pyserial installed; otherwise it is skipped. To
+run that test explicitly with the reader's venv:
+
+```sh
+RocketVisualizer/.venv/bin/python RocketVisualizer/tests/serial_integration.py RocketVisualizer/tools/serial_telemetry.py RocketVisualizer/build/ahrs_timeline_tests
+```
+
+For shell pipelines on Windows use `cmd.exe` to preserve streaming text.
 The visualizer follows the newest sample by default. Pause or scrub to inspect
 buffered history; **Timeline → Go To Live** or **End** resumes following. When
 input ends, the window stays open with the buffered timeline. A decreasing source
-timestamp clears history for a controller restart. Close the serial monitor with
-Ctrl+C when finished.
+timestamp clears history for a controller restart.
 
 ## Telemetry format
 

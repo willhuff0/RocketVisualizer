@@ -57,4 +57,8 @@ if(BUILD_TESTING)
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/stdin_integration.py
                 $<TARGET_FILE:ahrs_timeline_tests>)
     set_tests_properties(ahrs_stdin PROPERTIES TIMEOUT 15)
+    add_test(NAME ahrs_serial
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/serial_integration.py
+                ${CMAKE_CURRENT_SOURCE_DIR}/tools/serial_telemetry.py $<TARGET_FILE:ahrs_timeline_tests>)
+    set_tests_properties(ahrs_serial PROPERTIES TIMEOUT 20 SKIP_RETURN_CODE 77)
 endif()
