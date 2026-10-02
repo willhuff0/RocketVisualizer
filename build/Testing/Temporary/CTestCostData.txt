@@ -1,3 +1,0 @@
-ahrs_timeline 1 0.214365
-ahrs_stdin 1 0.0843089
----
