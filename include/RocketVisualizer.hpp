@@ -42,13 +42,14 @@ private:
     void _mainLoop();
 
     void _tick();
+    void _handleKeyboardShortcuts();
     void _updateRocketTransform();
 
     void _draw();
 
     void _drawUI();
-
     void _drawMenuBarUI();
     void _drawRocketStateUI();
     void _drawFinAnglesStateUI();
+    void _drawTimelineUI();
 };

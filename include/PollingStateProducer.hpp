@@ -4,6 +4,8 @@
 
 #include <memory>
 #include <thread>
+#include <functional>
+#include <atomic>
 
 class PollingStateProducer {
 public:

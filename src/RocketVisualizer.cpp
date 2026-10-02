@@ -10,6 +10,7 @@
 #include <iomanip>
 #include <algorithm>
 #include <cmath>
+#include <utility>
 
 const double RAD_TO_DEG = 57.295779513082320876798154814105f;
 const double DEG_TO_RAD = 1.0 / 57.295779513082320876798154814105f;
@@ -97,9 +98,25 @@ static void drawAxisLines(Vector3 position, Quaternion rotation, float length, b
     if (includeUp) DrawLine3D(position, endZ, ColorAlpha(BLUE, alpha));
 }
 
+static bool imGuiSliderDoubleWithSteps(const char* label, double* v, double vMin, double vMax, double vStep, const char* displayFormat) {
+    if (displayFormat == nullptr) displayFormat = "%.3f";
+
+    char textBuffer[64] = {};
+    std::snprintf(textBuffer, sizeof(textBuffer), displayFormat, *v);
+
+    // Map from [v_min,v_max] to [0,N]
+    const int countValues = static_cast<int>((vMax - vMin) / vStep);
+    int vi = static_cast<int>((*v - vMin) / vStep);
+    const bool didValueChange = ImGui::SliderInt(label, &vi, 0, countValues, textBuffer);
+
+    // Remap from [0,N] to [v_min,v_max]
+    *v = vMin + static_cast<double>(vi) * vStep;
+    return didValueChange;
+}
+
 RocketVisualizer::RocketVisualizer()
     : _csvLoader([&](RocketConfig newConfig, const auto& newTimeline) {
-        SetConfigAndTimeline(newConfig, newTimeline);
+        SetConfigAndTimeline(std::move(newConfig), newTimeline);
     })
 {
     SetConfigFlags(FLAG_VSYNC_HINT);
@@ -158,12 +175,50 @@ void RocketVisualizer::_mainLoop() {
 void RocketVisualizer::_tick() {
     rlImGuiBegin();
 
+    _handleKeyboardShortcuts();
+
+    // Advance timeline
+    if (_timeline == nullptr) return;
+    auto maybeRange = _timeline->GetRange();
+    if (!maybeRange.has_value()) return;
+    auto range = maybeRange.value();
+
+    _playback.Update(GetFrameTime(), range);
+    if (!_timeline->IsCapableOfLivePlayback() && _playback.GetCursor() >= range.end - 0.001) {
+        _playback.Pause();
+        _playback.Seek(range.end);
+    }
+
+    // Update rocket state
+    auto maybeState = _timeline->GetStateAt(_playback.GetCursor(), _interpolate);
+    if (!maybeState.has_value()) return;
+    auto state = maybeState.value();
+
+    // TODO: move world instead of rocket and camera
+    _state = state;
+    _position = {
+        static_cast<float>(state.position.x()),
+        static_cast<float>(state.position.y()),
+        static_cast<float>(state.position.z())
+    };
+    _rotation = {
+        static_cast<float>(state.orientation.x()),
+        static_cast<float>(state.orientation.y()),
+        static_cast<float>(state.orientation.z()),
+        static_cast<float>(state.orientation.w())
+    };
+
+    _updateRocketTransform();
+
+    _camera.Tick(_position);
+}
+
+void RocketVisualizer::_handleKeyboardShortcuts() {
     if (IsKeyDown(KEY_LEFT_CONTROL) && IsKeyPressed(KEY_O)) {
         _csvLoader.ShowImportDialog();
     }
 
     if (_timeline == nullptr) return;
-
     auto maybeRange = _timeline->GetRange();
     if (!maybeRange.has_value()) return;
     auto range = maybeRange.value();
@@ -197,34 +252,6 @@ void RocketVisualizer::_tick() {
     if (_timeline->IsCapableOfLivePlayback() && IsKeyPressed(KEY_END)) {
         _playback.FollowLive();
     }
-
-    _playback.Update(GetFrameTime(), range);
-    if (!_timeline->IsCapableOfLivePlayback() && _playback.GetCursor() >= range.end - 0.001) {
-        _playback.Pause();
-        _playback.Seek(range.end);
-    }
-
-    auto maybeState = _timeline->GetStateAt(_playback.GetCursor(), _interpolate);
-    if (!maybeState.has_value()) return;
-    auto state = maybeState.value();
-
-    // TODO: move world instead of rocket and camera
-    _state = state;
-    _position = {
-        static_cast<float>(state.position.x()),
-        static_cast<float>(state.position.y()),
-        static_cast<float>(state.position.z())
-    };
-    _rotation = {
-        static_cast<float>(state.orientation.x()),
-        static_cast<float>(state.orientation.y()),
-        static_cast<float>(state.orientation.z()),
-        static_cast<float>(state.orientation.w())
-    };
-
-    _updateRocketTransform();
-
-    _camera.Tick(_position);
 }
 
 void RocketVisualizer::_updateRocketTransform() {
@@ -289,115 +316,12 @@ void RocketVisualizer::_draw() {
     EndDrawing();
 }
 
-static bool ImGuiSliderDoubleWithSteps(const char* label, double* v, double v_min, double v_max, double v_step, const char* display_format) {
-    if (!display_format)
-        display_format = "%.3f";
-
-    char text_buf[64] = {};
-    std::snprintf(text_buf, sizeof(text_buf), display_format, *v);
-
-    // Map from [v_min,v_max] to [0,N]
-    const int countValues = int((v_max-v_min)/v_step);
-    int v_i = int((*v - v_min)/v_step);
-    const bool value_changed = ImGui::SliderInt(label, &v_i, 0, countValues, text_buf);
-
-    // Remap from [0,N] to [v_min,v_max]
-    *v = v_min + double(v_i) * v_step;
-    return value_changed;
-}
-
 void RocketVisualizer::_drawUI() {
     _csvLoader.DrawUI();
     _drawMenuBarUI();
     _drawRocketStateUI();
     _drawFinAnglesStateUI();
-
-    if (_timeline != nullptr) {
-        auto maybeRange = _timeline->GetRange();
-        if (maybeRange.has_value()) {
-            auto range = maybeRange.value();
-            auto cursor = _playback.GetCursor();
-
-            auto beginTimeString = formatTime(range.begin);
-            auto endTimeString = formatTime(range.end);
-
-            std::string currentTimeString;
-            if (_playback.GetPlaybackMode() == PlaybackMode::FollowLive) {
-                currentTimeString = "Live";
-            } else {
-                currentTimeString = formatTime(cursor);
-            }
-
-            const float timelineWindowHeight = 68.0f;
-            const float timelineWindowWidthFrac = 0.6f;
-
-            ImGuiViewport* viewport = ImGui::GetMainViewport();
-            float timelineWindowWidth = viewport->WorkSize.x * timelineWindowWidthFrac;
-
-            float timelineWindowX = viewport->WorkPos.x + (viewport->WorkSize.x - timelineWindowWidth) * 0.5f;
-            float timelineWindowY = viewport->WorkPos.y + viewport->WorkSize.y - timelineWindowHeight;
-
-            ImGui::SetNextWindowPos(ImVec2(timelineWindowX, timelineWindowY));
-            ImGui::SetNextWindowSize(ImVec2(timelineWindowWidth, timelineWindowHeight));
-            ImGui::Begin("##TimelineWindow", nullptr,
-                ImGuiWindowFlags_NoDecoration |
-                ImGuiWindowFlags_NoMove |
-                ImGuiWindowFlags_NoResize |
-                ImGuiWindowFlags_NoSavedSettings);
-
-            ImGui::Text(beginTimeString.c_str());
-            ImGui::SameLine();
-
-            bool isGrabHidden = false;
-            if (_playback.GetPlaybackMode() == PlaybackMode::FollowLive) {
-                ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
-                ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
-                isGrabHidden = true;
-            }
-            float textAfterWidth = ImGui::CalcTextSize(endTimeString.c_str()).x;
-            float spacing = ImGui::GetStyle().ItemSpacing.x;
-            float sliderWidth = ImGui::GetContentRegionAvail().x - textAfterWidth - spacing;
-            ImGui::SetNextItemWidth(sliderWidth);
-            if (ImGui::SliderScalar("##TimelineSlider", ImGuiDataType_Double, &cursor, &range.begin, &range.end, currentTimeString.c_str(), ImGuiSliderFlags_NoInput)) {
-                if (cursor <= range.begin + 0.001) {
-                    _playback.Pause();
-                    _playback.Seek(range.begin);
-                } else if (_timeline->IsCapableOfLivePlayback() && cursor >= range.end - 0.001) {
-                    _playback.FollowLive();
-                } else {
-                    if (_playback.GetPlaybackMode() == PlaybackMode::FollowLive) {
-                        _playback.Play();
-                    }
-                    _playback.Seek(cursor);
-                }
-            }
-            if (isGrabHidden) {
-                ImGui::PopStyleColor(2);
-            }
-
-            ImGui::SameLine();
-            ImGui::Text(endTimeString.c_str());
-
-            const float playPauseButtonWidth = 60.0f;
-            float textBeforeWidth = ImGui::CalcTextSize(beginTimeString.c_str()).x;
-            float playPauseButtonX = textBeforeWidth + spacing * 2.0f;
-            ImGui::SetCursorPosX(playPauseButtonX);
-            if (_playback.GetPlaybackMode() != PlaybackMode::Paused) {
-                if (ImGui::Button("Pause", ImVec2(playPauseButtonWidth, 0.0f))) {
-                    _playback.Pause();
-                }
-            } else {
-                if (ImGui::Button("Play", ImVec2(playPauseButtonWidth, 0.0f))) {
-                    _playback.Play();
-                    if (_playback.GetCursor() >= range.end - 0.001) {
-                        _playback.Seek(range.begin);
-                    }
-                }
-            }
-
-            ImGui::End();
-        }
-    }
+    _drawTimelineUI();
 }
 
 void RocketVisualizer::_drawMenuBarUI() {
@@ -422,7 +346,7 @@ void RocketVisualizer::_drawMenuBarUI() {
             ImGui::Separator();
             ImGui::SetNextItemWidth(150.0f);
             double speed = _playback.GetSpeed();
-            ImGuiSliderDoubleWithSteps("Speed", &speed, 0.0, 2.0, 0.1, "%.1f");
+            imGuiSliderDoubleWithSteps("Speed", &speed, 0.0, 2.0, 0.1, "%.1f");
             _playback.SetSpeed(speed);
 
             ImGui::EndMenu();
@@ -483,64 +407,153 @@ void RocketVisualizer::_drawMenuBarUI() {
 }
 
 void RocketVisualizer::_drawRocketStateUI() {
-    if (_timeline != nullptr) {
-        if (ImGui::Begin("Rocket State", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize)) {
-            constexpr auto timePrefix =        "Time              : ";
-            constexpr auto positionPrefix =    "Position   (XYZ)  : ";
-            constexpr auto quaternionPrefix =  "Quaternion (XYZW) : ";
-            constexpr auto eulerAnglesPrefix = "Euler      (ZYX)  : ";
+    if (_timeline == nullptr) return;
 
-            auto timeString = timePrefix +
-                formatDouble(_playback.GetCursor());
+    if (ImGui::Begin("Rocket State", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize)) {
+        constexpr auto timePrefix =        "Time              : ";
+        constexpr auto positionPrefix =    "Position   (XYZ)  : ";
+        constexpr auto quaternionPrefix =  "Quaternion (XYZW) : ";
+        constexpr auto eulerAnglesPrefix = "Euler      (ZYX)  : ";
 
-            auto positionString = positionPrefix +
-                formatDouble(_state.position.x()) + ", " +
-                formatDouble(_state.position.y()) + ", " +
-                formatDouble(_state.position.z());
+        auto timeString = timePrefix +
+            formatDouble(_playback.GetCursor());
 
-            auto quaternionString = quaternionPrefix +
-                formatDouble(_state.orientation.x()) + ", " +
-                formatDouble(_state.orientation.y()) + ", " +
-                formatDouble(_state.orientation.z()) + ", " +
-                formatDouble(_state.orientation.w());
+        auto positionString = positionPrefix +
+            formatDouble(_state.position.x()) + ", " +
+            formatDouble(_state.position.y()) + ", " +
+            formatDouble(_state.position.z());
 
-            Eigen::Matrix3d rotationMatrix = _state.orientation.toRotationMatrix();
-            Eigen::Vector3d eulerAnglesZYX = rotationMatrix.canonicalEulerAngles(2, 1, 0);
-            auto eulerAnglesString = eulerAnglesPrefix +
-                formatDouble(eulerAnglesZYX.x() * RAD_TO_DEG) + ", " +
-                formatDouble(eulerAnglesZYX.y() * RAD_TO_DEG) + ", " +
-                formatDouble(eulerAnglesZYX.z() * RAD_TO_DEG);
+        auto quaternionString = quaternionPrefix +
+            formatDouble(_state.orientation.x()) + ", " +
+            formatDouble(_state.orientation.y()) + ", " +
+            formatDouble(_state.orientation.z()) + ", " +
+            formatDouble(_state.orientation.w());
 
-            ImGui::Text(timeString.c_str());
-            ImGui::Spacing();
-            ImGui::Text(positionString.c_str());
-            ImGui::Text(quaternionString.c_str());
-            ImGui::Text(eulerAnglesString.c_str());
-        }
-        ImGui::End();
+        Eigen::Matrix3d rotationMatrix = _state.orientation.toRotationMatrix();
+        Eigen::Vector3d eulerAnglesZYX = rotationMatrix.canonicalEulerAngles(2, 1, 0);
+        auto eulerAnglesString = eulerAnglesPrefix +
+            formatDouble(eulerAnglesZYX.x() * RAD_TO_DEG) + ", " +
+            formatDouble(eulerAnglesZYX.y() * RAD_TO_DEG) + ", " +
+            formatDouble(eulerAnglesZYX.z() * RAD_TO_DEG);
+
+        ImGui::Text(timeString.c_str());
+        ImGui::Spacing();
+        ImGui::Text(positionString.c_str());
+        ImGui::Text(quaternionString.c_str());
+        ImGui::Text(eulerAnglesString.c_str());
     }
+    ImGui::End();
 }
 
 void RocketVisualizer::_drawFinAnglesStateUI() {
-    if (_timeline != nullptr && !_config.finNodeNames[0].empty()) {
-        if (ImGui::Begin("Fin States", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize)) {
-            ImGui::Text("Node              : Actual Angle, Target Angle");
-            ImGui::Spacing();
+    if (_timeline == nullptr || _config.finNodeNames[0].empty()) return;
 
-            for (size_t j = 0; j < MAX_FIN_COUNT; j++) {
-                if (_config.finNodeNames[j].empty()) break;
+    if (ImGui::Begin("Fin States", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize)) {
+        ImGui::Text("Node              : Actual Angle, Target Angle");
+        ImGui::Spacing();
 
-                std::ostringstream oss;
-                oss << std::left << std::fixed << std::setw(17) << _config.finNodeNames[j];
-                auto prefixStr = oss.str() + " : ";
+        for (size_t j = 0; j < MAX_FIN_COUNT; j++) {
+            if (_config.finNodeNames[j].empty()) break;
 
-                auto str = prefixStr +
-                    formatDouble(_state.actualFinAngles[j]) + ", " +
-                    formatDouble(_state.targetFinAngles[j]);
+            std::ostringstream oss;
+            oss << std::left << std::fixed << std::setw(17) << _config.finNodeNames[j];
+            auto prefixStr = oss.str() + " : ";
 
-                ImGui::Text(str.c_str());
+            auto str = prefixStr +
+                formatDouble(_state.actualFinAngles[j]) + ", " +
+                formatDouble(_state.targetFinAngles[j]);
+
+            ImGui::Text(str.c_str());
+        }
+    }
+    ImGui::End();
+}
+
+void RocketVisualizer::_drawTimelineUI() {
+    if (_timeline == nullptr)  return;
+
+    auto maybeRange = _timeline->GetRange();
+    if (!maybeRange.has_value()) return;
+    auto range = maybeRange.value();
+
+    auto cursor = _playback.GetCursor();
+
+    auto beginTimeString = formatTime(range.begin);
+    auto endTimeString = formatTime(range.end);
+
+    std::string currentTimeString;
+    if (_playback.GetPlaybackMode() == PlaybackMode::FollowLive) {
+        currentTimeString = "Live";
+    } else {
+        currentTimeString = formatTime(cursor);
+    }
+
+    const float timelineWindowHeight = 68.0f;
+    const float timelineWindowWidthFrac = 0.6f;
+
+    ImGuiViewport* viewport = ImGui::GetMainViewport();
+    float timelineWindowWidth = viewport->WorkSize.x * timelineWindowWidthFrac;
+
+    float timelineWindowX = viewport->WorkPos.x + (viewport->WorkSize.x - timelineWindowWidth) * 0.5f;
+    float timelineWindowY = viewport->WorkPos.y + viewport->WorkSize.y - timelineWindowHeight;
+
+    ImGui::SetNextWindowPos(ImVec2(timelineWindowX, timelineWindowY));
+    ImGui::SetNextWindowSize(ImVec2(timelineWindowWidth, timelineWindowHeight));
+    ImGui::Begin("##TimelineWindow", nullptr,
+        ImGuiWindowFlags_NoDecoration |
+        ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_NoResize |
+        ImGuiWindowFlags_NoSavedSettings);
+
+    ImGui::Text(beginTimeString.c_str());
+    ImGui::SameLine();
+
+    bool isGrabHidden = false;
+    if (_playback.GetPlaybackMode() == PlaybackMode::FollowLive) {
+        ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+        ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+        isGrabHidden = true;
+    }
+    float textAfterWidth = ImGui::CalcTextSize(endTimeString.c_str()).x;
+    float spacing = ImGui::GetStyle().ItemSpacing.x;
+    float sliderWidth = ImGui::GetContentRegionAvail().x - textAfterWidth - spacing;
+    ImGui::SetNextItemWidth(sliderWidth);
+    if (ImGui::SliderScalar("##TimelineSlider", ImGuiDataType_Double, &cursor, &range.begin, &range.end, currentTimeString.c_str(), ImGuiSliderFlags_NoInput)) {
+        if (cursor <= range.begin + 0.001) {
+            _playback.Pause();
+            _playback.Seek(range.begin);
+        } else if (_timeline->IsCapableOfLivePlayback() && cursor >= range.end - 0.001) {
+            _playback.FollowLive();
+        } else {
+            if (_playback.GetPlaybackMode() == PlaybackMode::FollowLive) {
+                _playback.Play();
+            }
+            _playback.Seek(cursor);
+        }
+    }
+    if (isGrabHidden) {
+        ImGui::PopStyleColor(2);
+    }
+
+    ImGui::SameLine();
+    ImGui::Text(endTimeString.c_str());
+
+    const float playPauseButtonWidth = 60.0f;
+    float textBeforeWidth = ImGui::CalcTextSize(beginTimeString.c_str()).x;
+    float playPauseButtonX = textBeforeWidth + spacing * 2.0f;
+    ImGui::SetCursorPosX(playPauseButtonX);
+    if (_playback.GetPlaybackMode() != PlaybackMode::Paused) {
+        if (ImGui::Button("Pause", ImVec2(playPauseButtonWidth, 0.0f))) {
+            _playback.Pause();
+        }
+    } else {
+        if (ImGui::Button("Play", ImVec2(playPauseButtonWidth, 0.0f))) {
+            _playback.Play();
+            if (_playback.GetCursor() >= range.end - 0.001) {
+                _playback.Seek(range.begin);
             }
         }
-        ImGui::End();
     }
+
+    ImGui::End();
 }
