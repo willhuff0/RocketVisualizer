@@ -11,6 +11,8 @@ public:
     std::optional<TimeRange> GetRange() const override;
     std::optional<RocketState> GetStateAt(double time, bool interpolate) const override;
 
+    void Clear() override;
+
     bool IsCapableOfLivePlayback() const override;
 
 private:

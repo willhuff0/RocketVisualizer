@@ -18,11 +18,13 @@ constexpr WorldFrame AllWorldFrames[] = {
 enum class BodyFrame : int {
     RDF = 0, // +X Right,    +Y Down,  +Z Forward (visualizer canonical)
     BRU = 1, // +X Backward, +Y Right, +Z Up (flight CSV)
-    OpenRocket = 2, // +X/+Y transverse reference axes, +Z Forward/Nose
+    FLU = 2, // +X Forward/Nose, +Y Left, +Z Up/Dorsal (ahrs)
+    OpenRocket = 3, // +X/+Y transverse reference axes, +Z Forward/Nose
 };
 constexpr BodyFrame AllBodyFrames[] = {
     BodyFrame::RDF,
     BodyFrame::BRU,
+    BodyFrame::FLU,
     BodyFrame::OpenRocket,
 };
 

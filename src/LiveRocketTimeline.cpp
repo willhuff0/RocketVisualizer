@@ -71,6 +71,12 @@ std::optional<RocketState> LiveRocketTimeline::GetStateAt(double time, bool inte
     }
 }
 
+void LiveRocketTimeline::Clear() {
+    std::lock_guard lock(_mutex);
+
+    _samples.clear();
+}
+
 bool LiveRocketTimeline::IsCapableOfLivePlayback() const {
     return true;
 }

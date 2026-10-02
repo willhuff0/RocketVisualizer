@@ -10,7 +10,7 @@ const char* GetWorldFrameLabel(WorldFrame worldFrame) {
     switch (worldFrame) {
         case WorldFrame::NWU: return "NWU [X North, Y West, Z Up] (Visualizer)";
         case WorldFrame::SEU: return "SEU [X South, Y East, Z Up] (Flight CSV)";
-        case WorldFrame::ENU: return "ENU [X East, Y North, Z Up] (OpenRocket)";
+        case WorldFrame::ENU: return "ENU [X East, Y North, Z Up] (OpenRocket / AHRS)";
         default: throw std::runtime_error("Unsupported WorldFrame");
     }
 }
@@ -19,6 +19,7 @@ const char* GetBodyFrameLabel(BodyFrame bodyFrame) {
     switch (bodyFrame) {
         case BodyFrame::RDF: return "RDF [X Right, Y Down, Z Forward] (Visualizer)";
         case BodyFrame::BRU: return "BRU [X Backward, Y Right, Z Up] (Flight CSV)";
+        case BodyFrame::FLU: return "FLU [X Forward, Y Left, Z Up] (AHRS)";
         case BodyFrame::OpenRocket: return "OpenRocket [X/Y Transverse, Z Nose]";
         default: throw std::runtime_error("Unsupported BodyFrame");
     }

@@ -68,6 +68,18 @@ target_link_libraries(RocketVisualizer PRIVATE Eigen3::Eigen)
 
 # ===
 
+# === Serial ===
+
+FetchContent_Declare(
+        serial_cpp
+        GIT_REPOSITORY https://github.com/ami-iit/serial_cpp.git
+        GIT_TAG v1.3.4
+)
+FetchContent_MakeAvailable(serial_cpp)
+target_link_libraries(RocketVisualizer PRIVATE serial_cpp::serial_cpp)
+
+#
+
 # === Header only dependencies
 
 target_include_directories(RocketVisualizer PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/third-party)
@@ -86,6 +98,10 @@ target_sources(RocketVisualizer
         src/PollingStateProducer.cpp
         src/CsvTimelineLoader.cpp
         src/CoordinateConverter.cpp
+        src/SerialRocketTimeline.cpp
+        src/SerialTimelineLoader.cpp
+        src/SerialLineParser.cpp
+        src/CoordinateSystemImportUI.cpp
         ${imgui_SOURCES}
         ${rlImGui_SOURCES}
     PUBLIC
@@ -102,6 +118,10 @@ target_sources(RocketVisualizer
         include/PollingStateProducer.hpp
         include/CsvTimelineLoader.hpp
         include/CoordinateConverter.hpp
+        include/SerialRocketTimeline.hpp
+        include/SerialTimelineLoader.hpp
+        include/SerialLineParser.hpp
+        include/CoordinateSystemImportUI.hpp
 )
 
 target_include_directories(RocketVisualizer

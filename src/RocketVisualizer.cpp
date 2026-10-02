@@ -117,6 +117,9 @@ static bool imGuiSliderDoubleWithSteps(const char* label, double* v, double vMin
 RocketVisualizer::RocketVisualizer()
     : _csvLoader([&](RocketConfig newConfig, const auto& newTimeline) {
         SetConfigAndTimeline(std::move(newConfig), newTimeline);
+    }),
+    _serialLoader([&](RocketConfig newConfig, const auto& newTimeline) {
+        SetConfigAndTimeline(std::move(newConfig), newTimeline);
     })
 {
     SetConfigFlags(FLAG_VSYNC_HINT);
@@ -217,6 +220,9 @@ void RocketVisualizer::_handleKeyboardShortcuts() {
     if (IsKeyDown(KEY_LEFT_CONTROL) && IsKeyPressed(KEY_O)) {
         _csvLoader.ShowImportDialog();
     }
+    if (IsKeyDown(KEY_LEFT_CONTROL) && IsKeyPressed(KEY_P)) {
+        _serialLoader.ShowConnectDialog();
+    }
 
     if (_timeline == nullptr) return;
     auto maybeRange = _timeline->GetRange();
@@ -251,6 +257,13 @@ void RocketVisualizer::_handleKeyboardShortcuts() {
     }
     if (_timeline->IsCapableOfLivePlayback() && IsKeyPressed(KEY_END)) {
         _playback.FollowLive();
+    }
+
+    if (_timeline->IsCapableOfLivePlayback() &&
+        IsKeyDown(KEY_LEFT_CONTROL) &&
+        IsKeyDown(KEY_LEFT_SHIFT) &&
+        IsKeyPressed(KEY_R)) {
+        _timeline->Clear();
     }
 }
 
@@ -318,6 +331,7 @@ void RocketVisualizer::_draw() {
 
 void RocketVisualizer::_drawUI() {
     _csvLoader.DrawUI();
+    _serialLoader.DrawUI();
     _drawMenuBarUI();
     _drawRocketStateUI();
     _drawFinAnglesStateUI();
@@ -329,6 +343,10 @@ void RocketVisualizer::_drawMenuBarUI() {
         if (ImGui::BeginMenu("File")) {
             if (ImGui::MenuItem("Open CSV", "Ctrl+O")) {
                 _csvLoader.ShowImportDialog();
+            }
+
+            if (ImGui::MenuItem("Connect Serial", "Ctrl+P")) {
+                _serialLoader.ShowConnectDialog();
             }
 
             ImGui::Separator();
@@ -394,6 +412,14 @@ void RocketVisualizer::_drawMenuBarUI() {
                             _playback.Seek(range.begin);
                         } else if (_playback.GetPlaybackMode() == PlaybackMode::FollowLive) {
                             _playback.Play();
+                        }
+                    }
+
+                    if (_timeline->IsCapableOfLivePlayback()) {
+                        ImGui::Separator();
+
+                        if (ImGui::MenuItem("Clear History", "Ctrl+Shift+R")) {
+                            _timeline->Clear();
                         }
                     }
 

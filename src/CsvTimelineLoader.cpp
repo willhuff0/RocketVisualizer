@@ -1,5 +1,7 @@
 #include <CsvTimelineLoader.hpp>
 
+#include "CoordinateConverter.hpp"
+
 #include <portable-file-dialogs.h>
 #include <rapidcsv.h>
 #include <imgui.h>
@@ -11,6 +13,83 @@
 #include <algorithm>
 
 constexpr float NAME_FIELD_WIDTH = 80.0f;
+
+const CsvImportConfig OPEN_ROCKET_PROFILE = {
+    .configName = "OpenRocket (TcpBridge)",
+    .coordinateSystem = {
+        .worldFrame = WorldFrame::ENU,
+        .bodyFrame = BodyFrame::OpenRocket,
+        .rotationDirection = RotationDirection::BodyToWorld,
+    },
+    .timeName = "##0",
+    .quaternion = {
+        .wName = "##4",
+        .xName = "##5",
+        .yName = "##6",
+        .zName = "##7",
+    },
+    .position = {
+        .xName = "##1",
+        .yName = "##2",
+        .zName = "##3",
+    },
+    .fins = {
+        CsvFinConfig {
+            .actualAngleName = "##8",
+            .targetAngleName = "##9",
+            .nodeName = "Fin_Top",
+            .rotationAxis = {1.0, 0.0, 0.0},
+        },
+        CsvFinConfig {
+            .actualAngleName = "##8",
+            .targetAngleName = "##9",
+            .nodeName = "Fin_Bottom",
+            .rotationAxis = {-1.0, 0.0, 0.0},
+        },
+        CsvFinConfig {
+            .actualAngleName = "##8",
+            .targetAngleName = "##9",
+            .nodeName = "Fin_Right",
+            .rotationAxis = {0.0, -1.0, 0.0},
+        },
+        CsvFinConfig {
+            .actualAngleName = "##8",
+            .targetAngleName = "##9",
+            .nodeName = "Fin_Left",
+            .rotationAxis = {0.0, 1.0, 0.0},
+        },
+    },
+    .finCount = 4,
+};
+
+const CsvImportConfig TEST_CSV_PROFILE = {
+    .configName = "Flight CSV",
+    .coordinateSystem = {
+        .worldFrame = WorldFrame::SEU,
+        .bodyFrame = BodyFrame::BRU,
+        .rotationDirection = RotationDirection::BodyToWorld,
+    },
+    .timeName = "time_s",
+    .quaternion = {
+        .wName = "q0",
+        .xName = "q1",
+        .yName = "q2",
+        .zName = "q3",
+    },
+    .position = {
+        .xName = "",
+        .yName = "",
+        .zName = "p3_n_m",
+    },
+};
+
+const CsvImportConfig CSV_IMPORT_PROFILES[] = {
+    {
+        .configName = "Visualizer (Canonical)",
+    },
+    OPEN_ROCKET_PROFILE,
+    TEST_CSV_PROFILE
+};
 
 static std::string selectCsvFile() {
     auto result = pfd::open_file("Select a CSV.", "", {
@@ -87,9 +166,9 @@ static std::shared_ptr<VectorRocketTimeline> loadTimelineFromCsv(const std::stri
                 };
                 sample.state.orientation = CoordinateConverter::ImportQuaternion(
                     sample.state.orientation,
-                    config.worldFrame,
-                    config.bodyFrame,
-                    config.rotationDirection
+                    config.coordinateSystem.worldFrame,
+                    config.coordinateSystem.bodyFrame,
+                    config.coordinateSystem.rotationDirection
                 );
             }
 
@@ -107,7 +186,7 @@ static std::shared_ptr<VectorRocketTimeline> loadTimelineFromCsv(const std::stri
             }
             sample.state.position = CoordinateConverter::ImportWorldVector(
                 sample.state.position,
-                config.worldFrame
+                config.coordinateSystem.worldFrame
             );
 
             for (size_t j = 0; j < MAX_FIN_COUNT; j++) {
@@ -151,7 +230,10 @@ void CsvTimelineLoader::DrawUI() {
     bool isModalOpen = true;
     if (ImGui::BeginPopupModal("Import CSV", &isModalOpen, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize)) {
         if (ImGui::Button("Select File")) {
-            _path = selectCsvFile();
+            std::string newPath = selectCsvFile();
+            if (!newPath.empty()) {
+                _path = newPath;
+            }
         }
         ImGui::SameLine();
         auto fileName = std::filesystem::path(_path).filename().string();
@@ -168,41 +250,7 @@ void CsvTimelineLoader::DrawUI() {
         }
 
         ImGui::Separator();
-        ImGui::Text("Coordinate System");
-
-        if (ImGui::BeginCombo("World", GetWorldFrameLabel(_config.worldFrame))) {
-            for (size_t i = 0; i < std::size(AllWorldFrames); i++) {
-                WorldFrame worldFrame = AllWorldFrames[i];
-
-                const char* label = GetWorldFrameLabel(worldFrame);
-                bool isSelected = _config.worldFrame == worldFrame;
-
-                if (ImGui::Selectable(label, isSelected)) {
-                    _config.worldFrame = worldFrame;
-                }
-                if (isSelected) {
-                    ImGui::SetItemDefaultFocus();
-                }
-            }
-            ImGui::EndCombo();
-        }
-
-        if (ImGui::BeginCombo("Body", GetBodyFrameLabel(_config.bodyFrame))) {
-            for (size_t i = 0; i < std::size(AllBodyFrames); i++) {
-                BodyFrame bodyFrame = AllBodyFrames[i];
-
-                const char* label = GetBodyFrameLabel(bodyFrame);
-                bool isSelected = _config.bodyFrame == bodyFrame;
-
-                if (ImGui::Selectable(label, isSelected)) {
-                    _config.bodyFrame = bodyFrame;
-                }
-                if (isSelected) {
-                    ImGui::SetItemDefaultFocus();
-                }
-            }
-            ImGui::EndCombo();
-        }
+        CoordinateSystemImportUI::Draw(_config.coordinateSystem);
 
         ImGui::Separator();
         ImGui::Text("Time");
@@ -214,23 +262,6 @@ void CsvTimelineLoader::DrawUI() {
 
         ImGui::Separator();
         ImGui::Text("Orientation");
-
-        if (ImGui::BeginCombo("Direction", GetRotationDirectionLabel(_config.rotationDirection))) {
-            for (size_t i = 0; i < std::size(AllRotationDirections); i++) {
-                RotationDirection rotationDirection = AllRotationDirections[i];
-
-                const char* label = GetRotationDirectionLabel(rotationDirection);
-                bool isSelected = _config.rotationDirection == rotationDirection;
-
-                if (ImGui::Selectable(label, isSelected)) {
-                    _config.rotationDirection = rotationDirection;
-                }
-                if (isSelected) {
-                    ImGui::SetItemDefaultFocus();
-                }
-            }
-            ImGui::EndCombo();
-        }
 
         ImGui::Text("Column Names");
 
@@ -269,6 +300,7 @@ void CsvTimelineLoader::DrawUI() {
         _drawFinList();
 
         ImGui::Separator();
+        ImGui::BeginDisabled(_path.empty());
         if (ImGui::Button("Import")) {
             auto result = loadTimelineFromCsv(_path, _config);
             if (result != nullptr) {
@@ -282,6 +314,7 @@ void CsvTimelineLoader::DrawUI() {
             }
             ImGui::CloseCurrentPopup();
         }
+        ImGui::EndDisabled();
 
         ImGui::EndPopup();
     }

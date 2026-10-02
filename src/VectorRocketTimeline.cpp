@@ -48,6 +48,10 @@ std::optional<RocketState> VectorRocketTimeline::GetStateAt(double time, bool in
     }
 }
 
+void VectorRocketTimeline::Clear() {
+    // VectorRocketTimeline should never clear
+}
+
 bool VectorRocketTimeline::IsCapableOfLivePlayback() const {
     return false;
 }

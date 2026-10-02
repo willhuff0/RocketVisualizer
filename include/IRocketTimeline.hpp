@@ -28,5 +28,7 @@ public:
      */
     virtual std::optional<RocketState> GetStateAt(double time, bool interpolate) const = 0;
 
+    virtual void Clear() = 0;
+
     virtual bool IsCapableOfLivePlayback() const = 0;
 };

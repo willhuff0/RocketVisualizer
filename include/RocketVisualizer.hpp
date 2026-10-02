@@ -4,6 +4,7 @@
 #include "IRocketTimeline.hpp"
 #include "PlaybackController.hpp"
 #include "CsvTimelineLoader.hpp"
+#include "SerialTimelineLoader.hpp"
 
 #include <raylib.h>
 #include <Eigen/Dense>
@@ -30,6 +31,7 @@ private:
     PlaybackController _playback;
 
     CsvTimelineLoader _csvLoader;
+    SerialTimelineLoader _serialLoader;
 
     RocketState _state;
     Vector3 _position = {0.0, 0.0, 0.0};
