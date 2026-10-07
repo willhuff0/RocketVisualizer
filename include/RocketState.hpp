@@ -16,5 +16,7 @@ struct RocketState {
     double actualFinAngles[MAX_FIN_COUNT] = {};
     double targetFinAngles[MAX_FIN_COUNT] = {};
 
+    std::string stateMachineState;
+
     static RocketState Interpolate(const RocketState& a, const RocketState& b, double t);
 };

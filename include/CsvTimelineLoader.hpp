@@ -36,6 +36,7 @@ struct CsvImportConfig {
     CoordinateSystemImportConfig coordinateSystem;
 
     std::string timeName = "time";
+    std::string stateMachineStateName = "state";
     CsvQuaternionConfig quaternion;
     CsvPositionConfig position;
     CsvFinConfig fins[MAX_FIN_COUNT] = {};

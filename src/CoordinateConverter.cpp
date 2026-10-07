@@ -9,8 +9,9 @@ constexpr BodyFrame CANONICAL_BODY_FRAME = BodyFrame::RDF;
 const char* GetWorldFrameLabel(WorldFrame worldFrame) {
     switch (worldFrame) {
         case WorldFrame::NWU: return "NWU [X North, Y West, Z Up] (Visualizer)";
-        case WorldFrame::SEU: return "SEU [X South, Y East, Z Up] (Flight CSV)";
-        case WorldFrame::ENU: return "ENU [X East, Y North, Z Up] (OpenRocket / AHRS)";
+        case WorldFrame::ENU: return "ENU [X East, Y North, Z Up] (OpenRocket)";
+        case WorldFrame::NED: return "NED [X North, Y East, Z Down]";
+        case WorldFrame::SEU: return "SEU [X South, Y East, Z Up]";
         default: throw std::runtime_error("Unsupported WorldFrame");
     }
 }
@@ -18,8 +19,8 @@ const char* GetWorldFrameLabel(WorldFrame worldFrame) {
 const char* GetBodyFrameLabel(BodyFrame bodyFrame) {
     switch (bodyFrame) {
         case BodyFrame::RDF: return "RDF [X Right, Y Down, Z Forward] (Visualizer)";
-        case BodyFrame::BRU: return "BRU [X Backward, Y Right, Z Up] (Flight CSV)";
         case BodyFrame::FLU: return "FLU [X Forward, Y Left, Z Up] (AHRS)";
+        case BodyFrame::BRU: return "BRU [X Backward, Y Right, Z Up]";
         case BodyFrame::OpenRocket: return "OpenRocket [X/Y Transverse, Z Nose]";
         default: throw std::runtime_error("Unsupported BodyFrame");
     }
@@ -100,6 +101,14 @@ static Eigen::Matrix3d getWorldBasisInNWU(WorldFrame frame) {
                  0,  0,  1;
             return B;
         }
+
+        case WorldFrame::NED: {
+            Eigen::Matrix3d B;
+            B << 1,  0,  0,
+                 0, -1,  0,
+                 0,  0, -1;
+            return B;
+        }
     }
 
     throw std::runtime_error("Unsupported WorldFrame");
@@ -115,7 +124,7 @@ static Eigen::Matrix3d getBodyBasisInRDF(BodyFrame frame){
     // Columns are the input body's +X,+Y,+Z axes
     // expressed in canonical RDF coordinates.
 
-    switch (frame){
+    switch (frame) {
         case BodyFrame::RDF:
             return Eigen::Matrix3d::Identity();
 
@@ -130,6 +139,14 @@ static Eigen::Matrix3d getBodyBasisInRDF(BodyFrame frame){
                  0,  1,  0,
                  0,  0, -1,
                 -1,  0,  0;
+            return B;
+        }
+
+        case BodyFrame::FLU: {
+            Eigen::Matrix3d B;
+            B << 0, -1,  0,
+                 0,  0, -1,
+                 1,  0,  0;
             return B;
         }
 

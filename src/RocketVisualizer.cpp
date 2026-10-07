@@ -62,6 +62,14 @@ static std::string formatTime(double time) {
     return oss.str();
 }
 
+static std::string formatString(const std::string& value) {
+    const int width = 11;
+
+    std::ostringstream oss;
+    oss << std::fixed << std::setw(width) << value;
+    return oss.str();
+}
+
 static void drawXYGrid(int slices, float spacing) {
     const float halfSize = static_cast<float>(slices) * spacing * 0.5f;
     const Color color = Fade(LIGHTGRAY, 0.35f);
@@ -127,13 +135,13 @@ RocketVisualizer::RocketVisualizer()
     rlImGuiSetup(true);
 
     auto& io = ImGui::GetIO();
-    io.FontDefault = io.Fonts->AddFontFromFileTTF("../resources/RobotoMono.ttf", 18.0f);
+    io.FontDefault = io.Fonts->AddFontFromFileTTF("../resources/fonts/RobotoMono.ttf", 18.0f);
 
-    _bodyModel = LoadModel("../resources/Rocket_Body.glb");
-    _finModels["Fin_Top"] = LoadModel("../resources/Rocket_Fin_Top.glb");
-    _finModels["Fin_Bottom"] = LoadModel("../resources/Rocket_Fin_Bottom.glb");
-    _finModels["Fin_Right"] = LoadModel("../resources/Rocket_Fin_Right.glb");
-    _finModels["Fin_Left"] = LoadModel("../resources/Rocket_Fin_Left.glb");
+    _bodyModel = LoadModel("../resources/models/Rocket_Body.glb");
+    _finModels["Fin_Top"] = LoadModel("../resources/models/Rocket_Fin_Top.glb");
+    _finModels["Fin_Bottom"] = LoadModel("../resources/models/Rocket_Fin_Bottom.glb");
+    _finModels["Fin_Right"] = LoadModel("../resources/models/Rocket_Fin_Right.glb");
+    _finModels["Fin_Left"] = LoadModel("../resources/models/Rocket_Fin_Left.glb");
 
     if (_timeline != nullptr && _timeline->IsCapableOfLivePlayback()) {
         _playback.FollowLive();
@@ -437,12 +445,16 @@ void RocketVisualizer::_drawRocketStateUI() {
 
     if (ImGui::Begin("Rocket State", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoResize)) {
         constexpr auto timePrefix =        "Time              : ";
+        constexpr auto statePrefix =       "State             : ";
         constexpr auto positionPrefix =    "Position   (XYZ)  : ";
-        constexpr auto quaternionPrefix =  "Quaternion (XYZW) : ";
+        constexpr auto quaternionPrefix =  "RDF->NWU   (XYZW) : ";
         constexpr auto eulerAnglesPrefix = "Euler      (ZYX)  : ";
 
         auto timeString = timePrefix +
             formatDouble(_playback.GetCursor());
+
+        auto stateString = statePrefix +
+            formatString(_state.stateMachineState);
 
         auto positionString = positionPrefix +
             formatDouble(_state.position.x()) + ", " +
@@ -462,11 +474,13 @@ void RocketVisualizer::_drawRocketStateUI() {
             formatDouble(eulerAnglesZYX.y() * RAD_TO_DEG) + ", " +
             formatDouble(eulerAnglesZYX.z() * RAD_TO_DEG);
 
-        ImGui::Text(timeString.c_str());
+        ImGui::TextUnformatted(timeString.c_str());
         ImGui::Spacing();
-        ImGui::Text(positionString.c_str());
-        ImGui::Text(quaternionString.c_str());
-        ImGui::Text(eulerAnglesString.c_str());
+        ImGui::TextUnformatted(stateString.c_str());
+        ImGui::Spacing();
+        ImGui::TextUnformatted(positionString.c_str());
+        ImGui::TextUnformatted(quaternionString.c_str());
+        ImGui::TextUnformatted(eulerAnglesString.c_str());
     }
     ImGui::End();
 }

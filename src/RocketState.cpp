@@ -12,6 +12,7 @@ RocketState RocketState::Interpolate(const RocketState& a, const RocketState& b,
     RocketState state = {
         .position = lerpVector3d(a.position, b.position, t),
         .orientation =  a.orientation.slerp(t, b.orientation),
+        .stateMachineState = a.stateMachineState,
     };
     for (size_t i = 0; i < MAX_FIN_COUNT; i++) {
         state.actualFinAngles[i] = lerpDouble(a.actualFinAngles[i], b.actualFinAngles[i], t);

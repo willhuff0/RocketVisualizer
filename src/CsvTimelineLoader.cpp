@@ -22,6 +22,7 @@ const CsvImportConfig OPEN_ROCKET_PROFILE = {
         .rotationDirection = RotationDirection::BodyToWorld,
     },
     .timeName = "##0",
+    .stateMachineStateName = "",
     .quaternion = {
         .wName = "##4",
         .xName = "##5",
@@ -62,14 +63,37 @@ const CsvImportConfig OPEN_ROCKET_PROFILE = {
     .finCount = 4,
 };
 
-const CsvImportConfig TEST_CSV_PROFILE = {
-    .configName = "Flight CSV",
+const CsvImportConfig FLIGHT_CSV_PROFILE = {
+    .configName = "Sounding Rocket 10/5/26",
+    .coordinateSystem = {
+        .worldFrame = WorldFrame::NED,
+        .bodyFrame = BodyFrame::FLU,
+        .rotationDirection = RotationDirection::BodyToWorld,
+    },
+    .timeName = "time_s",
+    .stateMachineStateName = "state",
+    .quaternion = {
+        .wName = "q_body2ned_w",
+        .xName = "q_body2ned_x",
+        .yName = "q_body2ned_y",
+        .zName = "q_body2ned_z",
+    },
+    .position = {
+        .xName = "pos_n_m",
+        .yName = "pos_e_m",
+        .zName = "pos_d_m",
+    },
+};
+
+const CsvImportConfig OLD_FLIGHT_CSV_PROFILE = {
+    .configName = "VDF2_03072026_FLIGHT_IDX",
     .coordinateSystem = {
         .worldFrame = WorldFrame::SEU,
         .bodyFrame = BodyFrame::BRU,
         .rotationDirection = RotationDirection::BodyToWorld,
     },
     .timeName = "time_s",
+    .stateMachineStateName = "",
     .quaternion = {
         .wName = "q0",
         .xName = "q1",
@@ -88,7 +112,8 @@ const CsvImportConfig CSV_IMPORT_PROFILES[] = {
         .configName = "Visualizer (Canonical)",
     },
     OPEN_ROCKET_PROFILE,
-    TEST_CSV_PROFILE
+    FLIGHT_CSV_PROFILE,
+    OLD_FLIGHT_CSV_PROFILE
 };
 
 static std::string selectCsvFile() {
@@ -99,7 +124,8 @@ static std::string selectCsvFile() {
     return result.front();
 }
 
-static std::vector<double> getColumn(
+template<typename T>
+static std::vector<T> getColumn(
     const std::string& name,
     const rapidcsv::Document& doc,
     const std::unordered_set<std::string>& columnNames)
@@ -109,13 +135,13 @@ static std::vector<double> getColumn(
         if (!columnIndexStr.empty()) {
             try {
                 int columnIndex = std::stoi(columnIndexStr);
-                return doc.GetColumn<double>(static_cast<size_t>(columnIndex));
+                return doc.GetColumn<T>(static_cast<size_t>(columnIndex));
             }
             catch (const std::exception& _) {}
         }
     }
 
-    return columnNames.contains(name) ? doc.GetColumn<double>(name) : std::vector<double>();
+    return columnNames.contains(name) ? doc.GetColumn<T>(name) : std::vector<T>();
 }
 
 static std::shared_ptr<VectorRocketTimeline> loadTimelineFromCsv(const std::string& path, CsvImportConfig config) {
@@ -125,28 +151,30 @@ static std::shared_ptr<VectorRocketTimeline> loadTimelineFromCsv(const std::stri
         auto columnNamesVec = doc.GetColumnNames();
         auto columnNames = std::unordered_set(columnNamesVec.begin(), columnNamesVec.end());
 
-        auto t = getColumn(config.timeName, doc, columnNames);
+        auto t = getColumn<double>(config.timeName, doc, columnNames);
 
-        auto qw = getColumn(config.quaternion.wName, doc, columnNames);
-        auto qx = getColumn(config.quaternion.xName, doc, columnNames);
-        auto qy = getColumn(config.quaternion.yName, doc, columnNames);
-        auto qz = getColumn(config.quaternion.zName, doc, columnNames);
+        auto qw = getColumn<double>(config.quaternion.wName, doc, columnNames);
+        auto qx = getColumn<double>(config.quaternion.xName, doc, columnNames);
+        auto qy = getColumn<double>(config.quaternion.yName, doc, columnNames);
+        auto qz = getColumn<double>(config.quaternion.zName, doc, columnNames);
         size_t qMinLength = (std::min)({qw.size(), qx.size(), qy.size(), qz.size()});
 
-        auto px = getColumn(config.position.xName, doc, columnNames);
-        auto py = getColumn(config.position.yName, doc, columnNames);
-        auto pz = getColumn(config.position.zName, doc, columnNames);
+        auto px = getColumn<double>(config.position.xName, doc, columnNames);
+        auto py = getColumn<double>(config.position.yName, doc, columnNames);
+        auto pz = getColumn<double>(config.position.zName, doc, columnNames);
         size_t pMaxLength = (std::max)({px.size(), py.size(), pz.size()});
 
         std::vector<double> actualFinAngles[MAX_FIN_COUNT];
         std::vector<double> targetFinAngles[MAX_FIN_COUNT];
         size_t finAnglesMaxLength = 0;
         for (size_t j = 0; j < MAX_FIN_COUNT; j++) {
-            actualFinAngles[j] = getColumn(config.fins[j].actualAngleName, doc, columnNames);
-            targetFinAngles[j] = getColumn(config.fins[j].targetAngleName, doc, columnNames);
+            actualFinAngles[j] = getColumn<double>(config.fins[j].actualAngleName, doc, columnNames);
+            targetFinAngles[j] = getColumn<double>(config.fins[j].targetAngleName, doc, columnNames);
 
             finAnglesMaxLength = (std::max)({finAnglesMaxLength, actualFinAngles[j].size(), targetFinAngles[j].size()});
         }
+
+        auto stateMachineStates = getColumn<std::string>(config.stateMachineStateName, doc, columnNames);
 
         size_t sampleCount = (std::min)(t.size(), (std::max)({qMinLength, pMaxLength, finAnglesMaxLength}));
         std::vector<TimedRocketState> samples;
@@ -203,6 +231,8 @@ static std::shared_ptr<VectorRocketTimeline> loadTimelineFromCsv(const std::stri
                 }
             }
 
+            sample.state.stateMachineState = stateMachineStates[i];
+
             samples.emplace_back(sample);
         }
 
@@ -254,16 +284,16 @@ void CsvTimelineLoader::DrawUI() {
 
         ImGui::Separator();
         ImGui::Text("Time");
-
-        ImGui::Text("Column Name");
-
         ImGui::SetNextItemWidth(NAME_FIELD_WIDTH);
         ImGui::InputText("t##Time", &_config.timeName);
 
         ImGui::Separator();
-        ImGui::Text("Orientation");
+        ImGui::Text("State");
+        ImGui::SetNextItemWidth(NAME_FIELD_WIDTH);
+        ImGui::InputText("state##StateMachineState", &_config.stateMachineStateName);
 
-        ImGui::Text("Column Names");
+        ImGui::Separator();
+        ImGui::Text("Orientation");
 
         ImGui::SetNextItemWidth(NAME_FIELD_WIDTH);
         ImGui::InputText("w##Quaternion", &_config.quaternion.wName);
@@ -282,8 +312,6 @@ void CsvTimelineLoader::DrawUI() {
 
         ImGui::Separator();
         ImGui::Text("Position");
-
-        ImGui::Text("Column Names");
 
         ImGui::SetNextItemWidth(NAME_FIELD_WIDTH);
         ImGui::InputText("x##Position", &_config.position.xName);

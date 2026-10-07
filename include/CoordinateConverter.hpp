@@ -5,26 +5,28 @@
 #include <vector>
 
 enum class WorldFrame : int {
-    NWU = 0, // +X North, +Y West, +Z Up
-    SEU = 1, // +X South, +Y East, +Z Up (flight CSV)
-    ENU = 2, // +X East,  +Y North, +Z Up (OpenRocket SimulationStatus)
+    NWU = 0, // +X North, +Y West, +Z Up (visualizer canonical)
+    ENU = 1, // +X East,  +Y North, +Z Up (OpenRocket SimulationStatus)
+    NED = 2, // +X North,  +Y East, +Z Down
+    SEU = 3, // +X South, +Y East, +Z Up
 };
 constexpr WorldFrame AllWorldFrames[] = {
     WorldFrame::NWU,
-    WorldFrame::SEU,
     WorldFrame::ENU,
+    WorldFrame::NED,
+    WorldFrame::SEU,
 };
 
 enum class BodyFrame : int {
     RDF = 0, // +X Right,    +Y Down,  +Z Forward (visualizer canonical)
-    BRU = 1, // +X Backward, +Y Right, +Z Up (flight CSV)
-    FLU = 2, // +X Forward/Nose, +Y Left, +Z Up/Dorsal (ahrs)
+    FLU = 1, // +X Forward/Nose, +Y Left, +Z Up/Dorsal (ahrs)
+    BRU = 2, // +X Backward, +Y Right, +Z Up
     OpenRocket = 3, // +X/+Y transverse reference axes, +Z Forward/Nose
 };
 constexpr BodyFrame AllBodyFrames[] = {
     BodyFrame::RDF,
-    BodyFrame::BRU,
     BodyFrame::FLU,
+    BodyFrame::BRU,
     BodyFrame::OpenRocket,
 };
 
